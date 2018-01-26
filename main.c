@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
             printf("UMABAFA\n");
 
             //if ((index = checkVarInCmd(words)) != 0) {
-            while ((index = checkVarInCmd(words)) != 0) {
+            while ((strcmp(words[0], "set") != 0) && (index = checkVarInCmd(words)) != 0) {
                 printf("adfafawefr %i\n", index);
                 char *var = words[index];
                 var++;
@@ -93,30 +93,42 @@ int main(int argc, char *argv[])
             printf("WTF: %s\n", words[0]);
             if (strcmp(words[0], "set") == 0)
             {
-                printf("IN SET\n");
-                int count = 0;
-                while (words[count] != NULL)
+                if (strpbrk(words[1], "$") != 0) {
+                    printf("IN SET\n");
+                    int count = 0;
+                    while (words[count] != NULL)
                         count++;
-                if (count != 3)
-                {
-                    printf("Error: Set command is in the wrong format!\n");
-                    for (int i = 0; i < count; i++)
-                        words[i] = NULL;
+                    if (count != 2) {
+                        printf("Error: Set command is in the wrong format!\n");
+                        for (int i = 0; i < count; i++)
+                            words[i] = NULL;
+                    } else {
+                        char* setCmdArgsPtr;
+                        char* setCmdArgs[2];
+                        int varIndex;
+                        setCmdArgsPtr = strtok(words[1],"=");
+                        while (setCmdArgsPtr!=NULL)
+                        {
+                            setCmdArgs[varIndex++]=strdup(setCmdArgsPtr);
+                            setCmdArgsPtr=strtok(NULL," ");
+                        }
+                        setCmdArgs[0]++;
+                        printf("SET1: %s\n", setCmdArgs[0]);
+                        printf("SET2: %s\n", setCmdArgs[1]);
+                        printf("IN SET ELSE\n");
+
+                        char *key = (char *) calloc(1, strlen(setCmdArgs[0]) + 1);
+                        char *value = (char *) calloc(1, strlen(setCmdArgs[1]) + 1);
+                        strcpy(key, setCmdArgs[0]);
+                        strcpy(value, setCmdArgs[1]);
+                        addNewVar(headVar, key, value);
+                        printf("HEAD: %s\n", headVar->value);
+                        for (int i = 0; i < count; i++)
+                            words[i] = NULL;
+                    }
+                    printf("-> ");
+                    continue;
                 }
-                else
-                {
-                    printf("IN SET ELSE\n");
-                    char* key = (char*) calloc(1 ,strlen(words[1]) + 1);
-                    char* value = (char*) calloc(1, strlen(words[2]) + 1);
-                    strcpy(key, words[1]);
-                    strcpy(value, words[2]);
-                    addNewVar(headVar, key, value);
-                    printf("HEAD: %s\n", headVar->value);
-                    for (int i = 0; i < count; i++)
-                        words[i] = NULL;
-                }
-                printf("-> ");
-                continue;
             }
 
 //*************
