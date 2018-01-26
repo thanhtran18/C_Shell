@@ -13,10 +13,10 @@ typedef struct variableList
     struct variableList* next;
 } variableList;
 
-int checkVarInCmd(char* command);
+int checkVarInCmd(char* command[]);
 void addNewVar(variableList* head, char* newVar, char* varValue);
 char* getVarValue(char* var, variableList* head);
-int replaceVarInCmd(char* command, int num, const char* newValue);
+int replaceVarInCmd(char* command[], int num, const char* newValue);
 static char* strCopy(const char* string1);
 
 int main(int argc, char *argv[])
@@ -29,7 +29,9 @@ int main(int argc, char *argv[])
     char *cptr;
     variableList* headVar = (variableList*) calloc(1, sizeof(variableList));
     printf("\nWelcome to my shell.\n\n-> ");
-    while (gets(buf)) {
+    while (gets(buf))
+    {
+        printf("HEAD AGAIN: %s\n", headVar->value);
         // fork child to exec command, parent waits for
         if (fork()) {
             // parent executes here
@@ -53,27 +55,31 @@ int main(int argc, char *argv[])
             //SOMETHING"S WRONG WITH checkVarInCmd
             int index;
             int loopBreak = 0;
-            printf("Number: $i\n", checkVarInCmd(words));
+            //printf("Number: %i\n", checkVarInCmd(words));
             printf("UMABAFA\n");
 
-            if ((index = checkVarInCmd(words)) != 0) {
-                while ((index = checkVarInCmd(words)) != 0) {
-                    printf("adfafawefr %i\n", index);
+            //if ((index = checkVarInCmd(words)) != 0) {
+            while ((index = checkVarInCmd(words)) != 0) {
+                printf("adfafawefr %i\n", index);
+                char *var = words[index];
+                var++;
+                char *value = getVarValue(var, headVar);
+                if (value == NULL) {
+                    loopBreak = 1;
                     char *var = words[index];
-                    var++;
-                    char *value = getVarValue(var, headVar);
-                    if (value == NULL) {
-                        loopBreak = 1;
-                        char *var = words[index];
-                        printf("No variable available: %s\n", var);
-                        break;
-                    } else if (!replaceVarInCmd(words, index, value)) {
-                        loopBreak = 1;
-                        printf("There is no such index: %u.\n", index);
-                        break;
-                    }
-                } //while
-            }
+                    printf("No variable available: %s\n", var);
+                    break;
+                } else if (!replaceVarInCmd(words, index, value)) {
+                    loopBreak = 1;
+                    printf("There is no such index: %u.\n", index);
+                    break;
+                }
+                else
+                {
+                    printf("@@@@%s\n", value);
+                }
+            } //while
+            //}
             printf("UMABAFA1\n");
             //printf("*******123%s\n", words[0]);
             //in case the variable in the command does not exist, quit the loop
@@ -87,28 +93,30 @@ int main(int argc, char *argv[])
             printf("WTF: %s\n", words[0]);
             if (strcmp(words[0], "set") == 0)
             {
+                printf("IN SET\n");
                 int count = 0;
-                for (int i = 0; i < 50; i++)
-                {
-                    if (words[i] != NULL)
+                while (words[count] != NULL)
                         count++;
-                    else
-                        break;
-                }
                 if (count != 3)
                 {
                     printf("Error: Set command is in the wrong format!\n");
-                    continue;
+                    for (int i = 0; i < count; i++)
+                        words[i] = NULL;
                 }
                 else
                 {
+                    printf("IN SET ELSE\n");
                     char* key = (char*) calloc(1 ,strlen(words[1]) + 1);
                     char* value = (char*) calloc(1, strlen(words[2]) + 1);
                     strcpy(key, words[1]);
                     strcpy(value, words[2]);
                     addNewVar(headVar, key, value);
-                    continue;
+                    printf("HEAD: %s\n", headVar->value);
+                    for (int i = 0; i < count; i++)
+                        words[i] = NULL;
                 }
+                printf("-> ");
+                continue;
             }
 
 //*************
@@ -131,10 +139,11 @@ int main(int argc, char *argv[])
     printf("\n\nShell Terminating.\n\n");
 } // end main
 
-int checkVarInCmd(char* command)
+int checkVarInCmd(char* command[])
 {
     int count = 0;
-    if (command[0] != NULL) {
+    if (command != NULL)
+    {
         while (command[count] != NULL)
             count++;
     }
@@ -143,13 +152,14 @@ int checkVarInCmd(char* command)
         return 0;
     }
     int index = 0;
-    for (; index <= count; index++)
+    for (; index < count; index++)
     {
         if (strpbrk(command[index], "$") != 0)
             return index;
     }
     return 0;
 } //checkVarInCmd
+
 
 void addNewVar(variableList* head, char* newVar, char* varValue)
 {
@@ -198,10 +208,10 @@ char* getVarValue(char* var, variableList* head)
     return head->value;
 } //getVarValue
 
-int replaceVarInCmd(char* command, int num, const char* newValue)
+int replaceVarInCmd(char* command[], int num, const char* newValue)
 {
     int count = 0;
-    if (command[count] != NULL) {
+    if (command != NULL) {
         while (command[count] != NULL)
             count++;
     }
@@ -209,14 +219,13 @@ int replaceVarInCmd(char* command, int num, const char* newValue)
     {
         return 0;
     }
-    while (command[count] != NULL)
-        count++;
     if (num >= count)
         return 0;
     FREE(command[num]);
     ((char**)command)[num] = strCopy(newValue);
     return 1;
 }
+
 
 /* Replaces the variable with the saved string value */
 /* Returns 0 if num is out-of-range, otherwise - returns 1 */
