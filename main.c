@@ -19,7 +19,6 @@ char* getVarValue(char* var, variableList* head);
 int replaceVarInCmd(char* command[], int count, int num, const char* newValue);
 static char* strCopy(const char* string1);
 unsigned int my_strlen(char *p);
-void freeCommand(char *command[], int count);
 
 int main(int argc, char *argv[])
 {
@@ -147,9 +146,6 @@ int main(int argc, char *argv[])
             {
                 if (words[count] == NULL)
                     break;
-
-                //printf("words %i : %s\n", count, words[count]);
-
             }
 
             while ((strcmp(words[0], "set") != 0) && (index = checkVarInCmd(words, count)) != 0)
@@ -167,10 +163,6 @@ int main(int argc, char *argv[])
                     printf("There is no such index: %u.\n", index);
                     break;
                 }
-                //else
-                //{
-                //    printf("@@@@%s\n", value);
-                //}
             } //while
 
             words[numwords]=NULL;
@@ -283,14 +275,4 @@ unsigned int my_strlen(char *p)
         p++;
     }
     return count;
-}
-
-void freeCommand(char *command[], int count)
-{
-    int i;
-    if (!command)
-        return;
-    for (i = 0; i < count; i++)
-        command[i] = NULL;
-    FREE(command);
 }
