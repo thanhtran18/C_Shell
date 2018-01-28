@@ -13,30 +13,32 @@ typedef struct variableList
     struct variableList* next;
 } variableList;
 
-int checkVarInCmd(char* command[]);
+int checkVarInCmd(char* command[], int count);
 void addNewVar(variableList* head, char* newVar, char* varValue);
 char* getVarValue(char* var, variableList* head);
-int replaceVarInCmd(char* command[], int num, const char* newValue);
+int replaceVarInCmd(char* command[], int count, int num, const char* newValue);
 static char* strCopy(const char* string1);
+unsigned int my_strlen(char *p);
+void freeCommand(char *command[], int count);
 
 int main(int argc, char *argv[])
 {
     char buf[132];
-    char *words[50];
+    char *words[50] = {'\0'};
     int numwords;
     int status;
     int rc;
     char *cptr;
     variableList* headVar = (variableList*) calloc(1, sizeof(variableList));
+    //char* setCmdArgsPtr;
+    //int varIndex;
     printf("\nWelcome to my shell.\n\n-> ");
     while (gets(buf))
     {
-        printf("HEAD AGAIN: %s\n", headVar->value);
         // fork child to exec command, parent waits for
         if (fork()) {
             // parent executes here
             wait(&status); // just wait for the child
-            //printf("*******%s\n", words[0]);
         }
         else
         {
@@ -49,18 +51,109 @@ int main(int argc, char *argv[])
                 words[numwords++]=strdup(cptr);
                 cptr=strtok(NULL," ");
             } // end while
-            // *****************
-            //if there is a variable in the user's command
-            printf("*******123%s\n", words[0]);
-            //SOMETHING"S WRONG WITH checkVarInCmd
+
             int index;
             int loopBreak = 0;
-            //printf("Number: %i\n", checkVarInCmd(words));
-            printf("UMABAFA\n");
 
-            //if ((index = checkVarInCmd(words)) != 0) {
-            while ((strcmp(words[0], "set") != 0) && (index = checkVarInCmd(words)) != 0) {
-                printf("adfafawefr %i\n", index);
+            int count;
+            for (count = 0; count < 50; count++)
+            {
+                if (words[count] == NULL)
+                    break;
+            }
+            if (loopBreak)
+            {
+                loopBreak = 0;
+                continue;
+            }
+
+            //process "set" command
+            if (strcmp(words[0], "set") == 0)
+            {
+                if (strpbrk(words[1], "$") != 0)
+                {
+                    //printf("IN SET\n");
+                    int count;
+                    for (count = 0; count < 50; count++)
+                    {
+                        if (words[count] == NULL)
+                            break;
+                        //printf("words %i : %s\n", count, words[count]);
+                    } //end for
+
+                    //printf("SIZE IS: %i\n", count);
+
+                    if (count != 2)
+                    {
+                        printf("Error: Set command is in the wrong format!\n");
+                        int i;
+                        for (i = 0; i < count; i++)
+                            words[i] = NULL;
+                    }
+                    else
+                    {
+                        int rightFormat = 0;
+                        int k;
+                        //the case user didn't enter '='
+                        for (k = 0; k < strlen(words[1]); k++)
+                        {
+                            if ((words[1])[k] == '=')
+                            {
+                                rightFormat = 1;
+                                break;
+                            }
+
+                        }
+                        if (rightFormat == 0)
+                            printf("Error: Set command is in the wrong format!\n");
+
+                        char* setCmdArgsPtr;
+                        char* setCmdArgs[2] = {'\0'};
+
+                        int varIndex = 0;
+
+                        setCmdArgsPtr = strtok(words[1],"=");
+
+
+                        while (setCmdArgsPtr!=NULL)
+                        {
+                            setCmdArgs[varIndex++] = strdup(setCmdArgsPtr);
+                            setCmdArgsPtr = strtok(NULL,"=");
+                        }
+                        setCmdArgs[0]++;
+
+
+                        char *key = (char *) calloc(1, strlen(setCmdArgs[0]) + 1);
+                        char *value = (char *) calloc(1, strlen(setCmdArgs[1]) + 1);
+                        strcpy(key, setCmdArgs[0]);
+
+                        strcpy(value, setCmdArgs[1]);
+                        addNewVar(headVar, key, value);
+                        int i;
+                        for (i = 0; i < count; i++)
+                            words[i] = NULL;
+                        setCmdArgs[0]--;
+
+                        varIndex = 0;
+                        free(setCmdArgsPtr);
+                    } //else
+
+                    printf("-> ");
+                    continue;
+                } //if $ sign
+            } //if "set"
+
+            for (count = 0; count < 50; count++)
+            {
+                if (words[count] == NULL)
+                    break;
+
+                //printf("words %i : %s\n", count, words[count]);
+
+            }
+
+            while ((strcmp(words[0], "set") != 0) && (index = checkVarInCmd(words, count)) != 0)
+            {
                 char *var = words[index];
                 var++;
                 char *value = getVarValue(var, headVar);
@@ -69,70 +162,17 @@ int main(int argc, char *argv[])
                     char *var = words[index];
                     printf("No variable available: %s\n", var);
                     break;
-                } else if (!replaceVarInCmd(words, index, value)) {
+                } else if (!replaceVarInCmd(words, count, index, value)) {
                     loopBreak = 1;
                     printf("There is no such index: %u.\n", index);
                     break;
                 }
-                else
-                {
-                    printf("@@@@%s\n", value);
-                }
+                //else
+                //{
+                //    printf("@@@@%s\n", value);
+                //}
             } //while
-            //}
-            printf("UMABAFA1\n");
-            //printf("*******123%s\n", words[0]);
-            //in case the variable in the command does not exist, quit the loop
-            if (loopBreak)
-            {
-                printf("CON CAC\n");
-                loopBreak = 0;
-                continue;
-            }
-            //process set command
-            printf("WTF: %s\n", words[0]);
-            if (strcmp(words[0], "set") == 0)
-            {
-                if (strpbrk(words[1], "$") != 0) {
-                    printf("IN SET\n");
-                    int count = 0;
-                    while (words[count] != NULL)
-                        count++;
-                    if (count != 2) {
-                        printf("Error: Set command is in the wrong format!\n");
-                        for (int i = 0; i < count; i++)
-                            words[i] = NULL;
-                    } else {
-                        char* setCmdArgsPtr;
-                        char* setCmdArgs[2];
-                        int varIndex;
-                        setCmdArgsPtr = strtok(words[1],"=");
-                        while (setCmdArgsPtr!=NULL)
-                        {
-                            setCmdArgs[varIndex++]=strdup(setCmdArgsPtr);
-                            setCmdArgsPtr=strtok(NULL," ");
-                        }
-                        setCmdArgs[0]++;
-                        printf("SET1: %s\n", setCmdArgs[0]);
-                        printf("SET2: %s\n", setCmdArgs[1]);
-                        printf("IN SET ELSE\n");
 
-                        char *key = (char *) calloc(1, strlen(setCmdArgs[0]) + 1);
-                        char *value = (char *) calloc(1, strlen(setCmdArgs[1]) + 1);
-                        strcpy(key, setCmdArgs[0]);
-                        strcpy(value, setCmdArgs[1]);
-                        addNewVar(headVar, key, value);
-                        printf("HEAD: %s\n", headVar->value);
-                        for (int i = 0; i < count; i++)
-                            words[i] = NULL;
-                    }
-                    printf("-> ");
-                    continue;
-                }
-            }
-
-//*************
-            //printf("*******123%s\n", words[0]);
             words[numwords]=NULL;
 
             rc=execv(words[0],words);
@@ -151,20 +191,13 @@ int main(int argc, char *argv[])
     printf("\n\nShell Terminating.\n\n");
 } // end main
 
-int checkVarInCmd(char* command[])
+int checkVarInCmd(char* command[], int count)
 {
-    int count = 0;
-    if (command != NULL)
-    {
-        while (command[count] != NULL)
-            count++;
-    }
-    else
-    {
+    if (command == NULL)
         return 0;
-    }
-    int index = 0;
-    for (; index < count; index++)
+
+    int index;
+    for (index = 0; index < count; index++)
     {
         if (strpbrk(command[index], "$") != 0)
             return index;
@@ -193,7 +226,7 @@ void addNewVar(variableList* head, char* newVar, char* varValue)
         head->var = newVar;
         head->value = varValue;
     }
-    //add the new var to the end if the it's not in the list already
+        //add the new var to the end if the it's not in the list already
     else
     {
         head->next = (variableList*) malloc(sizeof(variableList));
@@ -220,17 +253,10 @@ char* getVarValue(char* var, variableList* head)
     return head->value;
 } //getVarValue
 
-int replaceVarInCmd(char* command[], int num, const char* newValue)
+int replaceVarInCmd(char* command[], int count, int num, const char* newValue)
 {
-    int count = 0;
-    if (command != NULL) {
-        while (command[count] != NULL)
-            count++;
-    }
-    else
-    {
+    if (command == NULL)
         return 0;
-    }
     if (num >= count)
         return 0;
     FREE(command[num]);
@@ -246,4 +272,25 @@ static char* strCopy(const char* string1)
     char* string2 = (char*) malloc(strlen(string1) + 1);
     strcpy(string2, string1);
     return string2;
+}
+
+unsigned int my_strlen(char *p)
+{
+    unsigned int count = 0;
+    while(*p!='\0')
+    {
+        count++;
+        p++;
+    }
+    return count;
+}
+
+void freeCommand(char *command[], int count)
+{
+    int i;
+    if (!command)
+        return;
+    for (i = 0; i < count; i++)
+        command[i] = NULL;
+    FREE(command);
 }
