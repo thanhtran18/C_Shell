@@ -3,6 +3,8 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <sys/wait.h>
+
 
 #define FREE(X) if(X) free((void*)X)
 
@@ -13,6 +15,7 @@ typedef struct variableList
     struct variableList* next;
 } variableList;
 
+void pipeProcessor(char* words[]);
 int checkVarInCmd(char* command[], int count);
 void addNewVar(variableList* head, char* newVar, char* varValue);
 char* getVarValue(char* var, variableList* head);
@@ -72,7 +75,7 @@ int main(int argc, char *argv[])
                 continue;
             }
 
-            //process "set" command
+            //******* process "SET" command *******
             if (strcmp(words[0], "/bin/set") == 0)
             {
                 if (strpbrk(words[1], "$") != 0)
@@ -83,7 +86,6 @@ int main(int argc, char *argv[])
                     {
                         if (words[count] == NULL)
                             break;
-                        //printf("words %i : %s\n", count, words[count]);
                     } //end for
 
                     //printf("SIZE IS: %i\n", count);
@@ -145,8 +147,8 @@ int main(int argc, char *argv[])
 
                     printf("-> ");
                     continue;
-                } //if $ sign
-            } //if "set"
+                } //end if $ sign
+            } //end if "set"
 
             for (count = 0; count < 50; count++)
             {
@@ -154,6 +156,31 @@ int main(int argc, char *argv[])
                     break;
             }
 
+            // ******** process commands with PIPE *********
+            int k = 0;
+            while (words[k] != NULL)
+            {
+                if (strcmp(words[k], "|") == 0)
+                {
+                    if (words[k+1] == NULL)
+                        printf("Invalid pipe command!\n");
+                    char *path = "/bin/";
+                    char progpath[20];
+                    strcpy(progpath, path);
+                    strcat(progpath, words[k+1]);
+                    strcpy(words[k+1], progpath);
+
+                    pipeProcessor(words);
+                    //break;
+                    return 0;
+                }
+                else
+                    k++;
+            } //end while for PIPE
+
+
+
+            //********* process command with VARIABLE **********
             while ((strcmp(words[0], "set") != 0) && (index = checkVarInCmd(words, count)) != 0)
             {
                 char *var = words[index];
@@ -188,6 +215,133 @@ int main(int argc, char *argv[])
     } // end while
     printf("\n\nShell Terminating.\n\n");
 } // end main
+
+void pipeProcessor(char* words[])
+{
+    int fileDes_0[2]; //filedes
+    int fileDes_1[2]; //filedes2
+    int numCmds = 0;
+    char* command[256];
+    int pid;
+    int error = -1;
+    int stop = 0; //end
+    //get the number of commands
+    int i = 0; //instead of l
+    while (words[i] != NULL)
+    {
+        if (strcmp(words[i], "|") == 0)
+            numCmds++;
+        i++;
+    }
+    numCmds++;
+
+    //loop through each pari of commands
+    //int i = 0;
+    int j = 0;
+    int k = 0;
+    int l = 0;
+    while (words[j] != NULL && stop != 1)
+    {
+        k = 0;
+        while (strcmp(words[j], "|") != 0)
+        {
+            command[k] = words[j];
+            j++;
+            if (words[j] == NULL)
+            {
+                stop == 1;
+                k++;
+                break;
+            }
+            k++;
+        } //end while
+        command[k] = NULL;
+        j++;
+
+        //int l = 0; //instead of i
+        //set up the pipe to connect two different commands
+        if (l % 2 != 0)
+            pipe(fileDes_0);
+        else
+            pipe(fileDes_1);
+
+        pid = fork();
+
+        if (pid == -1)
+        {
+            if (l != numCmds - 1)
+            {
+                if (l % 2 != 0)
+                    close(fileDes_0[1]);
+                else
+                    close(fileDes_1[1]);
+            }
+            printf("Child process could not be created!\n");
+            return;
+        } //end if pid == -1
+        if (pid == 0)
+        {
+            //first comand
+            if (l == 0)
+                dup2(fileDes_1[1], STDOUT_FILENO);
+                //check if we are in the last command
+            else if (l == numCmds -1)
+            {
+                if (numCmds % 2 != 0)
+                    dup2(fileDes_0[0], STDIN_FILENO);
+                else
+                    dup2(fileDes_1[0], STDIN_FILENO);
+            }
+            else //middle commands
+            {
+                if (l % 2 != 0)
+                {
+                    dup2(fileDes_1[0], STDIN_FILENO);
+                    dup2(fileDes_0[1], STDOUT_FILENO);
+                }
+                else
+                {
+                    dup2(fileDes_0[0], STDIN_FILENO);
+                    dup2(fileDes_1[1], STDOUT_FILENO);
+                }
+            } //end else
+
+            if (execvp(command[0], command) == error)
+                kill(getpid(), SIGTERM);
+        } //end pid == 0
+
+        //closing descriptors on parent
+        if (l == 0)
+            close(fileDes_1[1]);
+        else if (l == numCmds - 1)
+        {
+            if (numCmds % 2 != 0)
+                close(fileDes_0[0]);
+            else
+                close(fileDes_1[0]);
+        }
+        else
+        {
+            if (l % 2 != 0)
+            {
+                close(fileDes_1[0]);
+                close(fileDes_0[1]);
+            }
+            else
+            {
+                close(fileDes_0[0]);
+                close(fileDes_1[1]);
+            }
+        }
+        waitpid(pid, NULL, 0);
+        l++;
+    } //end big while
+} //end pipeProcessor
+
+
+
+
+
 
 int checkVarInCmd(char* command[], int count)
 {
