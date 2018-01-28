@@ -28,6 +28,8 @@ int main(int argc, char *argv[])
     int status;
     int rc;
     char *cptr;
+    char *path = "/bin/";
+    char progpath[20];
     variableList* headVar = (variableList*) calloc(1, sizeof(variableList));
     //char* setCmdArgsPtr;
     //int varIndex;
@@ -51,6 +53,10 @@ int main(int argc, char *argv[])
                 cptr=strtok(NULL," ");
             } // end while
 
+            strcpy(progpath, path);
+            strcat(progpath, words[0]);
+            strcpy(words[0], progpath);
+
             int index;
             int loopBreak = 0;
 
@@ -67,7 +73,7 @@ int main(int argc, char *argv[])
             }
 
             //process "set" command
-            if (strcmp(words[0], "set") == 0)
+            if (strcmp(words[0], "/bin/set") == 0)
             {
                 if (strpbrk(words[1], "$") != 0)
                 {
