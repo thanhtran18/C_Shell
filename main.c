@@ -4,8 +4,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
-
+//#define STDOUT 1
 #define FREE(X) if(X) free((void*)X)
 
 typedef struct variableList
@@ -34,11 +35,14 @@ int main(int argc, char *argv[])
     char *path = "/bin/";
     char progpath[20];
     variableList* headVar = (variableList*) calloc(1, sizeof(variableList));
+    int bigLoopBreak = 0;
+    int printTermination = 1;
     //char* setCmdArgsPtr;
     //int varIndex;
     printf("\nWelcome to my shell.\n\n-> ");
     while (gets(buf))
     {
+
         // fork child to exec command, parent waits for
         if (fork()) {
             // parent executes here
@@ -171,13 +175,60 @@ int main(int argc, char *argv[])
                     strcpy(words[k+1], progpath);
 
                     pipeProcessor(words);
-                    //break;
-                    return 0;
+                    bigLoopBreak = 1;
+                    break;
+                }
+                    //************ process OUTPUT REDIRECTION *********
+                else if (strcmp(words[k], ">") == 0)
+                {
+                    if ((index = checkVarInCmd(words, count)) != 0)
+                    {
+                        char *var = words[index];
+                        var++;
+                        char *value = getVarValue(var, headVar);
+                        if (value == NULL) {
+                            loopBreak = 1;
+                            char *var = words[index];
+                            printf("No variable available: %s\n", var);
+                            break;
+                        } else if (!replaceVarInCmd(words, count, index, value)) {
+                            loopBreak = 1;
+                            printf("There is no such index: %u.\n", index);
+                            break;
+                        }
+                    } //end process of variable in output direction
+
+                    if (words[k+1] == NULL)
+                        printf("Invalid pipe command!\n");
+                    close(STDOUT_FILENO);
+                    fopen(words[k+1], "w");
+
+                    char *legalCmd[20];
+                    int m = 0;
+                    int n = 0;
+                    while (words[m] != NULL)
+                    {
+                        if (strcmp(words[m], ">") == 0)
+                            m++;
+                        else
+                            legalCmd[n] = words[m];
+                        m++;
+                        n++;
+                    }
+                    rc=execv(legalCmd[0],legalCmd);
+                    bigLoopBreak = 1;
+                    break;
                 }
                 else
                     k++;
             } //end while for PIPE
 
+            if (bigLoopBreak)
+            {
+                //printf("-> ");
+                printTermination = 0;
+                break;
+            }
 
 
             //********* process command with VARIABLE **********
@@ -213,7 +264,8 @@ int main(int argc, char *argv[])
         } // end if
         printf("-> ");
     } // end while
-    printf("\n\nShell Terminating.\n\n");
+    if (printTermination == 1)
+        printf("\n\nShell Terminating.\n\n");
 } // end main
 
 void pipeProcessor(char* words[])
