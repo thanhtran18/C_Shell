@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <signal.h>
 
 //#define STDOUT 1
 #define FREE(X) if(X) free((void*)X)
@@ -22,7 +23,7 @@ void addNewVar(variableList* head, char* newVar, char* varValue);
 char* getVarValue(char* var, variableList* head);
 int replaceVarInCmd(char* command[], int count, int num, const char* newValue);
 static char* strCopy(const char* string1);
-unsigned int my_strlen(char *p);
+void printVariables(variableList* head);
 
 int main(int argc, char *argv[])
 {
@@ -39,7 +40,7 @@ int main(int argc, char *argv[])
     int printTermination = 1;
     //char* setCmdArgsPtr;
     //int varIndex;
-    printf("\nWelcome to my shell.\n\n-> ");
+    printf("\nWelcome to my shell (press \"print\" to print all variables, \"load $filename\" to load a sequence of commands from a text file).\n\n-> ");
     while (gets(buf))
     {
 
@@ -154,10 +155,10 @@ int main(int argc, char *argv[])
                 } //end if $ sign
             } //end if "set"
 
-            for (count = 0; count < 50; count++)
+
+            if (strcmp(words[0], "/bin/print") == 0)
             {
-                if (words[count] == NULL)
-                    break;
+                printVariables(headVar);
             }
 
             // ******** process commands with PIPE *********
@@ -433,11 +434,16 @@ void addNewVar(variableList* head, char* newVar, char* varValue)
         //add the new var to the end if the it's not in the list already
     else
     {
-        head->next = (variableList*) malloc(sizeof(variableList));
-        head = head->next;
-        head->next = NULL;
-        head->value = newVar;
-        head->value = varValue;
+        variableList* newTail = (variableList*) malloc(sizeof(variableList));
+        newTail->var = newVar;
+        newTail->value = varValue;
+        newTail->next = NULL;
+        variableList* curr = head;
+        while (curr->next != NULL)
+        {
+            curr = curr->next;
+        }
+        curr->next = newTail;
     }
 } //addNewVar
 
@@ -478,13 +484,18 @@ static char* strCopy(const char* string1)
     return string2;
 }
 
-unsigned int my_strlen(char *p)
+void printVariables(variableList* head)
 {
-    unsigned int count = 0;
-    while(*p!='\0')
-    {
-        count++;
-        p++;
+    if(head == NULL){
+        printf("The environment is empty.\n");
+        return;
     }
-    return count;
+    if(head->var == NULL){
+        printf("The environment is empty.\n");
+        return;
+    }
+    while(head != NULL){
+        printf("%s=%s\n", head->var, head->value);
+        head = head->next;
+    }
 }
