@@ -5,7 +5,6 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <fcntl.h>
-#include <signal.h>
 
 //#define STDOUT 1
 #define FREE(X) if(X) free((void*)X)
@@ -17,7 +16,8 @@ typedef struct variableList
     struct variableList* next;
 } variableList;
 
-void pipeProcessor(char* words[]);
+void processSetCmd(char* words[], variableList* headVar);
+void processPipeCmd(char* words[]);
 int checkVarInCmd(char* command[], int count);
 void addNewVar(variableList* head, char* newVar, char* varValue);
 char* getVarValue(char* var, variableList* head);
@@ -40,10 +40,10 @@ int main(int argc, char *argv[])
     int printTermination = 1;
     //char* setCmdArgsPtr;
     //int varIndex;
-    printf("\nWelcome to my shell (press \"print\" to print all variables, \"load $filename\" to load a sequence of commands from a text file).\n\n-> ");
+    printf("\nWelcome to my shell.Welcome to my shell (press \"print\" to print all variables, \"load $filename\" to load a sequence of commands from a text file).\n\n-> ");
     while (gets(buf))
     {
-
+        printf("BUF IS : \"%s\"\n", buf);
         // fork child to exec command, parent waits for
         if (fork()) {
             // parent executes here
@@ -83,82 +83,61 @@ int main(int argc, char *argv[])
             //******* process "SET" command *******
             if (strcmp(words[0], "/bin/set") == 0)
             {
-                if (strpbrk(words[1], "$") != 0)
-                {
-                    //printf("IN SET\n");
-                    int count;
-                    for (count = 0; count < 50; count++)
-                    {
-                        if (words[count] == NULL)
-                            break;
-                    } //end for
-
-                    //printf("SIZE IS: %i\n", count);
-
-                    if (count != 2)
-                    {
-                        printf("Error: Set command is in the wrong format!\n");
-                        int i;
-                        for (i = 0; i < count; i++)
-                            words[i] = NULL;
-                    }
-                    else
-                    {
-                        int rightFormat = 0;
-                        int k;
-                        //the case user didn't enter '='
-                        for (k = 0; k < strlen(words[1]); k++)
-                        {
-                            if ((words[1])[k] == '=')
-                            {
-                                rightFormat = 1;
-                                break;
-                            }
-
-                        }
-                        if (rightFormat == 0)
-                            printf("Error: Set command is in the wrong format!\n");
-
-                        char* setCmdArgsPtr;
-                        char* setCmdArgs[2] = {'\0'};
-
-                        int varIndex = 0;
-
-                        setCmdArgsPtr = strtok(words[1],"=");
-
-
-                        while (setCmdArgsPtr!=NULL)
-                        {
-                            setCmdArgs[varIndex++] = strdup(setCmdArgsPtr);
-                            setCmdArgsPtr = strtok(NULL,"=");
-                        }
-                        setCmdArgs[0]++;
-
-
-                        char *key = (char *) calloc(1, strlen(setCmdArgs[0]) + 1);
-                        char *value = (char *) calloc(1, strlen(setCmdArgs[1]) + 1);
-                        strcpy(key, setCmdArgs[0]);
-
-                        strcpy(value, setCmdArgs[1]);
-                        addNewVar(headVar, key, value);
-                        int i;
-                        for (i = 0; i < count; i++)
-                            words[i] = NULL;
-                        setCmdArgs[0]--;
-
-                        varIndex = 0;
-                        free(setCmdArgsPtr);
-                    } //else
-
-                    printf("-> ");
-                    continue;
-                } //end if $ sign
+                processSetCmd(words, headVar);
+                printf("-> ");
+                continue;
+                //} //end if $ sign
             } //end if "set"
-
 
             if (strcmp(words[0], "/bin/print") == 0)
             {
                 printVariables(headVar);
+            }
+            // ******** process PRE-LOADING file ********
+            if (strcmp(words[0], "/bin/load") == 0)
+            {
+                if (argc <= 1)
+                    printf("wrong loading format\n");
+                char const* const fileName = words[1]; /* should check that argc > 1 */
+                printf("File name : %s\n", fileName);
+                FILE* file = fopen(fileName, "r"); /* should check the result */
+                char line[132];
+                char *newWords[50] = {'\0'};
+                char* line_ptr;
+                char progpath[20];
+
+                while (fgets(line, 132, file))
+                {
+                    char *pos;
+                    line[strlen(line) - 1] = '\0';
+                    printf("line is \"%s\"\n", line);
+                    int wordPos=0;
+                    line_ptr = strtok(line, " ");
+                    while (line_ptr != NULL)
+                    {
+                        newWords[wordPos] = strdup(line_ptr);
+                        printf("newWords %i is : %s\n", wordPos, newWords[wordPos]);
+                        wordPos++;
+                        line_ptr = strtok(NULL, " ");
+                    } // end while
+                    printf("####\n");
+                    strcpy(progpath, path);
+                    strcat(progpath, newWords[0]);
+                    strcpy(newWords[0], progpath);
+
+                    processSetCmd(newWords, headVar);
+                } //end while
+
+                fclose(file);
+                printf("-> ");
+                continue;
+            } //end pre-loading
+
+            //int count;
+            for (count = 0; count < 50; count++)
+            {
+                if (words[count] == NULL)
+                    break;
             }
 
             // ******** process commands with PIPE *********
@@ -175,7 +154,7 @@ int main(int argc, char *argv[])
                     strcat(progpath, words[k+1]);
                     strcpy(words[k+1], progpath);
 
-                    pipeProcessor(words);
+                    processPipeCmd(words);
                     bigLoopBreak = 1;
                     break;
                 }
@@ -222,7 +201,7 @@ int main(int argc, char *argv[])
                 }
                 else
                     k++;
-            } //end while for PIPE
+            } //end while for PIPE & output direction
 
             if (bigLoopBreak)
             {
@@ -269,7 +248,75 @@ int main(int argc, char *argv[])
         printf("\n\nShell Terminating.\n\n");
 } // end main
 
-void pipeProcessor(char* words[])
+void processSetCmd(char* words[], variableList* headVar)
+{
+    if (strpbrk(words[1], "$") != 0)
+    {
+        //printf("IN SET\n");
+        int count;
+        for (count = 0; count < 50; count++)
+        {
+            if (words[count] == NULL)
+                break;
+        } //end for
+
+        if (count != 2)
+        {
+            printf("Error: Set command is in the wrong format!\n");
+            int i;
+            for (i = 0; i < count; i++)
+                words[i] = NULL;
+        }
+        else
+        {
+            int rightFormat = 0;
+            int k;
+            //the case user didn't enter '='
+            for (k = 0; k < strlen(words[1]); k++)
+            {
+                if ((words[1])[k] == '=')
+                {
+                    rightFormat = 1;
+                    break;
+                }
+
+            } //end for
+
+            if (rightFormat == 0)
+                printf("Error: Set command is in the wrong format!\n");
+
+            char* setCmdArgsPtr;
+            char* setCmdArgs[2] = {'\0'};
+
+            int varIndex = 0;
+
+            setCmdArgsPtr = strtok(words[1], "=");
+            while (setCmdArgsPtr!=NULL)
+            {
+                setCmdArgs[varIndex++] = strdup(setCmdArgsPtr);
+                setCmdArgsPtr = strtok(NULL,"=");
+            }
+            setCmdArgs[0]++;
+
+            char *key = (char *) calloc(1, strlen(setCmdArgs[0]) + 1);
+            char *value = (char *) calloc(1, strlen(setCmdArgs[1]) + 1);
+            strcpy(key, setCmdArgs[0]);
+            strcpy(value, setCmdArgs[1]);
+            addNewVar(headVar, key, value);
+            int i;
+            for (i = 0; i < count; i++)
+            {
+                printf("adsfa %i: %s\n", i, words[i]);
+                words[i] = NULL;
+            }
+            setCmdArgs[0]--;
+            varIndex = 0;
+            free(setCmdArgsPtr);
+        } //else
+    } //end if
+} //end processSetCmd
+
+void processPipeCmd(char* words[])
 {
     int fileDes_0[2]; //filedes
     int fileDes_1[2]; //filedes2
@@ -389,12 +436,7 @@ void pipeProcessor(char* words[])
         waitpid(pid, NULL, 0);
         l++;
     } //end big while
-} //end pipeProcessor
-
-
-
-
-
+} //end processPipeCmd
 
 int checkVarInCmd(char* command[], int count)
 {
@@ -409,7 +451,6 @@ int checkVarInCmd(char* command[], int count)
     }
     return 0;
 } //checkVarInCmd
-
 
 void addNewVar(variableList* head, char* newVar, char* varValue)
 {
@@ -449,18 +490,19 @@ void addNewVar(variableList* head, char* newVar, char* varValue)
 
 char* getVarValue(char* var, variableList* head)
 {
-    while (head != NULL)
+    if (head == NULL)
+        return NULL;
+    variableList* curr = head;
+    while (curr != NULL)
     {
-        if (head->var == NULL)
-            break;
-        if (strcmp(var, head->var) != 0)
-            head = head->next;
+        if (curr->var == NULL)
+            return NULL;
+        if (strcmp(var, curr->var) != 0)
+            curr = curr->next;
         else
             break;
     }
-    if (head== NULL)
-        return NULL;
-    return head->value;
+    return curr->value;
 } //getVarValue
 
 int replaceVarInCmd(char* command[], int count, int num, const char* newValue)
@@ -486,15 +528,18 @@ static char* strCopy(const char* string1)
 
 void printVariables(variableList* head)
 {
-    if(head == NULL){
-        printf("The environment is empty.\n");
+    if(head == NULL)
+    {
+        printf("There is no saved variables!\n");
         return;
     }
-    if(head->var == NULL){
-        printf("The environment is empty.\n");
+    if(head->var == NULL)
+    {
+        printf("There is no such variable!\n");
         return;
     }
-    while(head != NULL){
+    while(head != NULL)
+    {
         printf("%s=%s\n", head->var, head->value);
         head = head->next;
     }
